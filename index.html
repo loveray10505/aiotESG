@@ -1,0 +1,263 @@
+<html><head><base href="https://websim.io/linear-regression-web/">
+<title>Advanced Linear Regression Simulator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+body {
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.6;
+  color: #e0e0e0;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #1a1a2e;
+}
+
+h1, h2, h3 {
+  color: #4ecca3;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.container {
+  display: flex;
+  background-color: #16213e;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(78, 204, 163, 0.2);
+  overflow: hidden;
+}
+
+.controls {
+  flex: 1;
+  padding: 20px;
+  background-color: #0f3460;
+  border-right: 1px solid #4ecca3;
+}
+
+.chart-container {
+  flex: 2;
+  padding: 20px;
+}
+
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: bold;
+  color: #4ecca3;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: #16213e;
+  outline: none;
+  margin-top: 10px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #4ecca3;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #4ecca3;
+  cursor: pointer;
+}
+
+#results {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #4ecca3;
+}
+
+canvas {
+  max-width: 100%;
+  height: auto;
+  background-color: #16213e;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(78, 204, 163, 0.1);
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+  
+  .controls, .chart-container {
+    width: 100%;
+  }
+}
+
+/* Glowing effect */
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px #4ecca3;
+  }
+  50% {
+    box-shadow: 0 0 20px #4ecca3;
+  }
+  100% {
+    box-shadow: 0 0 5px #4ecca3;
+  }
+}
+
+.container {
+  animation: glow 3s infinite;
+}
+</style>
+</head>
+<body>
+<h1>Advanced Linear Regression Simulator</h1>
+<div class="container">
+  <div class="controls">
+    <h2>Control Panel</h2>
+    <label for="slope">Slope (a): <span id="slopeValue">1</span></label>
+    <input type="range" id="slope" min="-50" max="50" value="1" step="0.1">
+    
+    <label for="points">Data Points (n): <span id="pointsValue">500</span></label>
+    <input type="range" id="points" min="100" max="1000" value="500" step="10">
+    
+    <label for="noise">Noise Factor (c): <span id="noiseValue">20</span></label>
+    <input type="range" id="noise" min="10" max="100" value="20" step="1">
+
+    <div id="results">
+      <h3>Analysis Results</h3>
+      <p>Regression Equation: <span id="equation"></span></p>
+      <p>R-squared Value: <span id="r-squared"></span></p>
+    </div>
+  </div>
+  <div class="chart-container">
+    <canvas id="plot"></canvas>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+<script>
+let chart;
+
+function generateData(n, a, b, c) {
+    const x = Array.from({length: n}, () => Math.random() * 9 + 1);
+    const y = x.map(xi => a * xi + b + c * (Math.random() + Math.random() + Math.random() - 1.5));
+    return {x, y};
+}
+
+function linearRegression(x, y) {
+    const n = x.length;
+    let sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
+    for (let i = 0; i < n; i++) {
+        sum_x += x[i];
+        sum_y += y[i];
+        sum_xy += x[i] * y[i];
+        sum_xx += x[i] * x[i];
+    }
+    const slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+    const intercept = (sum_y - slope * sum_x) / n;
+    return {slope, intercept};
+}
+
+function calculateRSquared(x, y, slope, intercept) {
+    const yMean = y.reduce((a, b) => a + b) / y.length;
+    const ssRes = y.reduce((sum, yi, i) => sum + Math.pow(yi - (slope * x[i] + intercept), 2), 0);
+    const ssTot = y.reduce((sum, yi) => sum + Math.pow(yi - yMean, 2), 0);
+    return 1 - (ssRes / ssTot);
+}
+
+function updateChart() {
+    const a = parseFloat(document.getElementById('slope').value);
+    const n = parseInt(document.getElementById('points').value);
+    const c = parseFloat(document.getElementById('noise').value);
+    const b = 5; // y-intercept
+
+    const {x, y} = generateData(n, a, b, c);
+    const {slope, intercept} = linearRegression(x, y);
+    const rSquared = calculateRSquared(x, y, slope, intercept);
+
+    const regressionLine = x.map(xi => slope * xi + intercept);
+
+    chart.data.datasets[0].data = x.map((xi, i) => ({x: xi, y: y[i]}));
+    chart.data.datasets[1].data = x.map((xi, i) => ({x: xi, y: regressionLine[i]}));
+    chart.update();
+
+    document.getElementById('equation').textContent = `y = ${slope.toFixed(2)}x + ${intercept.toFixed(2)}`;
+    document.getElementById('r-squared').textContent = rSquared.toFixed(4);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('plot').getContext('2d');
+    Chart.defaults.color = '#e0e0e0';
+    Chart.defaults.borderColor = '#4ecca3';
+    
+    chart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Data Points',
+                data: [],
+                backgroundColor: 'rgba(78, 204, 163, 0.6)'
+            }, {
+                label: 'Regression Line',
+                data: [],
+                type: 'line',
+                borderColor: 'rgba(231, 76, 60, 1)',
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'linear',
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'X Axis'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Y Axis'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#e0e0e0'
+                    }
+                }
+            }
+        }
+    });
+
+    updateChart();
+
+    document.getElementById('slope').addEventListener('input', (e) => {
+        document.getElementById('slopeValue').textContent = e.target.value;
+        updateChart();
+    });
+
+    document.getElementById('points').addEventListener('input', (e) => {
+        document.getElementById('pointsValue').textContent = e.target.value;
+        updateChart();
+    });
+
+    document.getElementById('noise').addEventListener('input', (e) => {
+        document.getElementById('noiseValue').textContent = e.target.value;
+        updateChart();
+    });
+});
+</script>
+</body></html>
